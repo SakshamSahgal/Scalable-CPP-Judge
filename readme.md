@@ -6,3 +6,11 @@
    2. MLE (Memory Limit Exceeded)
    3. CE (compilation Error)
    4. Executed Successfully
+
+
+
+100 virtual uses spamming API simultainously benchmark results - 
+
+
+
+<img src="./Scale.jpeg">
