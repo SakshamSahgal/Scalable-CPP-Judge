@@ -1,7 +1,8 @@
 #include <iostream>
 using namespace std;
 int main() {
-    int n = 1000;
+    int n;
+	cin>>n;
 	while(n--){
 	cout<<"Hello World!!!!!\n";
 	}

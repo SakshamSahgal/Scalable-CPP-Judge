@@ -4,6 +4,7 @@ executable_path="$2"
 output_file_path="$3"
 time_limit="$4"  # Time limit in seconds
 max_file_size="$5"  # Max file size limit in bytes
+input_value="$6"  # Input value to be passed to stdin
 
 # Compile the code
 g++ -o "${executable_path}" "$script_path"
@@ -14,8 +15,8 @@ if [ $? -ne 0 ]; then
     exit 3
 fi
 
-# Execute the command with a time limit and stream its stdout into the output file
-timeout "$time_limit"s sh -c "$executable_path | head -c $max_file_size > $output_file_path"
+# Execute the command with a time limit, passing input value to stdin, and stream its stdout into the output file
+timeout "$time_limit"s sh -c "echo '$input_value' | $executable_path | head -c $max_file_size > $output_file_path"
 
 # Check the exit status of the timeout command
 exit_status=$?
@@ -31,7 +32,7 @@ elif [ $exit_status -ne 0 ]; then
     rm -f "$output_file_path"  # Remove the output file
     exit 4  # Exit code for other errors
 else
-    # Check if output file size is exactly equal to max_file_size
+    # Check if output file size is equal to or greater than max_file_size
     file_size=$(stat -c %s "$output_file_path")
     if [ "$file_size" -ge "$max_file_size" ]; then
         echo "mle"  # Return "mle" if file size matches max_file_size

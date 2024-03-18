@@ -13,4 +13,4 @@
 
 
 
-<img src="./Scale.jpeg">
+<img title="" src="./Scale.jpeg" alt="" data-align="center">
