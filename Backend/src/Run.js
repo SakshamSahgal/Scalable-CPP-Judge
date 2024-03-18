@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { exec } = require('child_process');
+const { spawn } = require('child_process');
 const { execFile } = require('child_process');
 
 function DeleteAfterExecution(JobId, ...filePaths) {
@@ -33,15 +33,6 @@ async function WriteLogsToFile(logs, JobId) {
     });
 }
 
-//this route will be used to run the c++ code
-//it first takes the code and input in body of the request
-//Then it writes the code to a .cpp file
-//Then it compiles and runs the .cpp file
-//Then it passes the input to the stdin of the running script
-//Then it writes the output to a .txt file
-
-
-
 async function writeCppToFile(code, scriptPath, JobId) {
     return new Promise((resolve, reject) => {
         fs.writeFile(scriptPath, code, (err) => {
@@ -58,32 +49,6 @@ async function writeCppToFile(code, scriptPath, JobId) {
     });
 }
 
-
-async function runCommand(command, JobId) {
-    return new Promise((resolve, reject) => {
-        exec(command, (error, stdout, stderr) => {
-            if (error) {
-                console.log(`Error occurred while running the command ${command}, err : ${error}`);
-                WriteLogsToFile(`Error occurred while running the command ${command}, err : ${error}`, JobId);
-                reject(error);
-                return;
-            }
-            if (stderr) {
-                console.log(`Error occurred while running the command ${command}, stderr : ${stderr}`);
-                WriteLogsToFile(`Error occurred while running the command ${command}, stderr : ${stderr}`, JobId);
-                reject(new Error(stderr));
-                return;
-            }
-            console.log(`Successfully ran the command ${command}`);
-            // Extract the exit code from the error object if it exists
-            const exitCode = error ? error.code : 0;
-            resolve(exitCode);
-        });
-    });
-}
-
-
-
 //Possible Responses - 
 //{ success: false, message: `script took too long to execute.`, verdict: "Time Limit Exceeded" }
 //{ success: false, message: `Error occurred while writing the ${scriptPath} file`, verdict: "Runtime Error" }
@@ -98,7 +63,7 @@ async function RunCpp(code, input, TimeLimit = 5) {
         let scriptName = Date.now();
         let JobId = scriptName;
         let scriptPath = path.join(__dirname, `${scriptName}.cpp`)
-        let executablePath = path.join(__dirname, `${scriptName}`)
+        let executablePath = path.join(__dirname, `${scriptName}.out`)
         let outputFilePath = path.join(__dirname, `${scriptName}.txt`)
 
 
@@ -106,84 +71,63 @@ async function RunCpp(code, input, TimeLimit = 5) {
         try {
             await writeCppToFile(code, scriptPath, JobId);
             try {
-                //compile the .cpp file into an executable file
-                await runCommand(`g++ ${scriptPath} -o ${executablePath}`, JobId);
-
-                try {
-
-                    try {
-                        scriptArguments = [executablePath, outputFilePath, TimeLimit, process.env.MemoryLimitForOutputFileInBytes];
-                        const child = execFile('/bin/bash', [path.join(__dirname, "script.sh"), ...scriptArguments], (error, stdout, stderr) => {
-                            if (error) {
-                                console.log(`Exit code: ${error.code}`); // Log the exit code
-                                if (error.code === 1) {
-                                    resolve({
-                                        success: false,
-                                        message: `Error occured while running the script ${executablePath}`,
-                                        verdict: "Runtime Error"
-                                    });
-                                }
-                                if (error.code === 2) {
-                                    resolve({
-                                        success: false,
-                                        message: `script took too long to execute.`,
-                                        verdict: "Time Limit Exceeded"
-                                    });
-                                }
-                                else { //exit code 3
-                                    resolve({
-                                        success: false,
-                                        message: `Output File size exceeds ${(process.env.MemoryLimitForOutputFileInBytes / (1024 * 1024))} MB`,
-                                        verdict: "Memory Limit Exceeded"
-                                    });
-                                }
-                                DeleteAfterExecution(JobId, scriptPath, executablePath);
-                            }
-                            else {
-                                resolve({
-                                    success: true,
-                                    outputFilePath: outputFilePath,
-                                    verdict: "Run Successful"
-                                });
-                                DeleteAfterExecution(JobId, scriptPath, executablePath);
-                            }
-                        });
+                scriptArguments = [scriptPath, executablePath, outputFilePath, TimeLimit, process.env.MemoryLimitForOutputFileInBytes];
+                const child = execFile('/bin/bash', [path.join(__dirname, "script.sh"), ...scriptArguments], (error, stdout, stderr) => {
+                    if (error) {
+                        console.log(`Exit code: ${error.code}`); // Log the exit code
+                        if (error.code === 1) {
+                            resolve({
+                                success: false,
+                                message: `script took too long to execute.`,
+                                verdict: "Time Limit Exceeded"
+                            });
+                        }
+                        else if (error.code === 2) {
+                            resolve({
+                                success: false,
+                                message: `Output File size exceeds ${(process.env.MemoryLimitForOutputFileInBytes / (1024 * 1024))} MB`,
+                                verdict: "Memory Limit Exceeded"
+                            });
+                        }
+                        else if (error.code === 3) {
+                            resolve({
+                                success: false,
+                                message: `Error occurred while Compiling the code`,
+                                verdict: "Compilation Error"
+                            });
+                        }
+                        else{
+                            resolve({
+                                success: false,
+                                message: `Error occured while running the script ${executablePath}`,
+                                verdict: "Runtime Error"
+                            });
+                        }
+                        DeleteAfterExecution(JobId, scriptPath, executablePath);
                     }
-                    catch (err) {
-                        reject({
-                            success: false,
-                            message: `Error occurred while running the command ${command}, err : ${err}`,
-                            verdict: "Compilation Error"
+                    else {
+                        resolve({
+                            success: true,
+                            outputFilePath: outputFilePath,
+                            verdict: "Run Successful"
                         });
                         DeleteAfterExecution(JobId, scriptPath, executablePath);
-                        return;
                     }
-
-
-                } catch (err) {
-                    reject({
-                        success: false,
-                        message: `Error occurred while running the command ${command}, err : ${err}`,
-                        verdict: "Compilation Error"
-                    });
-                    DeleteAfterExecution(JobId, scriptPath, executablePath);
-                    return;
-                }
-
-            } catch (err) {
+                });
+            }
+            catch (err) {
                 reject({
                     success: false,
-                    message: `Error occured while running the script ${executablePath}`,
+                    message: `Error occurred, err : ${err}`,
                     verdict: "Compilation Error"
                 });
                 DeleteAfterExecution(JobId, scriptPath, executablePath);
                 return;
             }
-
         } catch (err) {
             reject({
                 success: false,
-                message: `Error occured while running the script ${executablePath}`,
+                message: `Error occurred while writing the ${scriptPath} file`,
                 verdict: "Compilation Error"
             });
             DeleteAfterExecution(JobId, executablePath, scriptPath);

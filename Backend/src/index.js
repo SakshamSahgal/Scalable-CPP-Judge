@@ -16,15 +16,3 @@ app.get("/run", (req, res) => {
     res.send(result)
   })
 })
-
-
-// app.get("/testscript", (req, res) => {
-//   //run the script in ShellTesting/script.sh
-//   const { execFile } = require('child_process');
-//   const child = execFile('/bin/bash', [path.join(__dirname,"script.sh")], (error, stdout, stderr) => {
-//     if (error) {
-//       throw error;
-//     }
-//     console.log(stdout);
-//   });
-// })
