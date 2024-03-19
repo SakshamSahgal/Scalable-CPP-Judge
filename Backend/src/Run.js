@@ -71,7 +71,7 @@ async function RunCpp(code, input, TimeLimit = 5) {
         try {
             await writeCppToFile(code, scriptPath, JobId);
             try {
-                scriptArguments = [scriptPath, executablePath, outputFilePath, TimeLimit, process.env.MemoryLimitForOutputFileInBytes];
+                scriptArguments = [scriptPath, executablePath, outputFilePath, TimeLimit, process.env.MemoryLimitForOutputFileInBytes, input];
                 const child = execFile('/bin/bash', [path.join(__dirname, "script.sh"), ...scriptArguments], (error, stdout, stderr) => {
                     if (error) {
                         console.log(`Exit code: ${error.code}`); // Log the exit code
